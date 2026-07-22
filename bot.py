@@ -19,21 +19,26 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
 # ============================== SOZLAMALAR ==============================
+# ⚠️ Faqat shu qiymatlarni o'zgartiring, kod qismiga tegmang.
+
 BOT_TOKEN = "8429697464:AAHK3ahqA9Fcf2JnGdA4cXm1m-mq8QPLwMg"
 
-ADMIN_ID = 8404969600
+ADMIN_ID = 8404969600  # xabarnoma yuboriladigan admin Telegram ID
 
-DB_PATH = "hamyon.db"
+DB_PATH = "hamyon.db"  # SQLite fayli - alohida baza server kerak emas
 
+# --- Hamyon API sozlamalari ---
 HAMYON_API_BASE = "https://hamyon-api.uz"
 SHOP_ID = "443"
 SHOP_KEY = "15089791c7ea"
 
+# To'lov qabul qilinadigan karta raqami (foydalanuvchiga ko'rsatiladi)
 PAYMENT_CARD = "5614 6867 0787 6770"
 
 MIN_AMOUNT = 1000
 MAX_AMOUNT = 10_000_000
 
+# To'lov holatini necha soniyada bir tekshirish
 CHECK_INTERVAL_SECONDS = 10
 # ==========================================================================
 
@@ -47,6 +52,8 @@ dp = Dispatcher(storage=MemoryStorage())
 class TopUp(StatesGroup):
     waiting_amount = State()
 
+
+# ---------------------------------------------------------------- DATABASE
 
 def connect_db():
     conn = sqlite3.connect(DB_PATH)
@@ -107,6 +114,8 @@ def add_balance(user_id: int, amount: int):
     db.close()
 
 
+# ------------------------------------------------------------------ MENUS
+
 def main_menu() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -123,6 +132,8 @@ def back_menu() -> ReplyKeyboardMarkup:
         resize_keyboard=True,
     )
 
+
+# ---------------------------------------------------------------- HANDLERS
 
 @dp.message(Command("start"))
 async def cmd_start(msg: types.Message, state: FSMContext):
@@ -265,6 +276,8 @@ async def cancel_payment(call: types.CallbackQuery):
     await call.answer()
 
 
+# ------------------------------------------------------------- BACKGROUND
+
 async def check_payments_loop():
     while True:
         try:
@@ -336,6 +349,8 @@ async def check_payments_loop():
 
         await asyncio.sleep(CHECK_INTERVAL_SECONDS)
 
+
+# ------------------------------------------------------------------- MAIN
 
 async def main():
     init_db()

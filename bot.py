@@ -203,7 +203,7 @@ async def create_payment(msg: types.Message, state: FSMContext):
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f"{HAMYON_API_BASE}/payment/create",
-                data={
+                json={
                     "shop_id": SHOP_ID,
                     "shop_key": SHOP_KEY,
                     "amount": amount,

@@ -2,6 +2,7 @@ import asyncio
 import logging
 import datetime
 import sqlite3
+import json
 
 import aiohttp
 from aiogram import Bot, Dispatcher, types
@@ -209,7 +210,27 @@ async def create_payment(msg: types.Message, state: FSMContext):
                 },
                 timeout=aiohttp.ClientTimeout(total=15),
             ) as resp:
-                data = await resp.json()
+                raw_text = await resp.text()
+                try:
+                    data = json.loads(raw_text)
+                except json.JSONDecodeError:
+                    log.error(
+                        "Hamyon API returned non-JSON (status %s): %s",
+                        resp.status, raw_text[:500],
+                    )
+                    cur.close()
+                    db.close()
+                    await msg.answer(
+                        "❌ Hamyon API kutilmagan javob qaytardi. "
+                        "Birozdan so'ng qayta urinib ko'ring yoki admin bilan bog'laning."
+                    )
+                    return
+    except asyncio.TimeoutError:
+        log.error("Hamyon API timeout on payment create")
+        cur.close()
+        db.close()
+        await msg.answer("❌ Hamyon API javob bermadi (timeout). Birozdan so'ng qayta urinib ko'ring.")
+        return
     except Exception:
         log.exception("Payment create failed")
         cur.close()
@@ -220,8 +241,9 @@ async def create_payment(msg: types.Message, state: FSMContext):
     if not data.get("success"):
         cur.close()
         db.close()
+        reason = data.get("message") or data.get("error") or data
         log.error("Hamyon API rejected payment create: %s", data)
-        await msg.answer("❌ To'lov yaratib bo'lmadi. Qaytadan urinib ko'ring.")
+        await msg.answer(f"❌ To'lov yaratib bo'lmadi.\nSabab: <code>{reason}</code>")
         return
 
     payment_id = data.get("payment_id")

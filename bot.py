@@ -203,7 +203,7 @@ async def create_payment(msg: types.Message, state: FSMContext):
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f"{HAMYON_API_BASE}/payment/create",
-                json={
+                data={
                     "shop_id": SHOP_ID,
                     "shop_key": SHOP_KEY,
                     "amount": amount,
@@ -238,7 +238,10 @@ async def create_payment(msg: types.Message, state: FSMContext):
         await msg.answer("❌ To'lov yaratishda xatolik yuz berdi. Birozdan so'ng qayta urinib ko'ring.")
         return
 
-    if not data.get("success"):
+    payment_id = data.get("payment_id")
+    card = data.get("card") or PAYMENT_CARD
+
+    if not payment_id:
         cur.close()
         db.close()
         reason = data.get("message") or data.get("error") or data
@@ -246,7 +249,6 @@ async def create_payment(msg: types.Message, state: FSMContext):
         await msg.answer(f"❌ To'lov yaratib bo'lmadi.\nSabab: <code>{reason}</code>")
         return
 
-    payment_id = data.get("payment_id")
     now = datetime.datetime.now().isoformat()
 
     cur.execute(
@@ -270,7 +272,7 @@ async def create_payment(msg: types.Message, state: FSMContext):
         f"✅ To'lov yaratildi!\n\n"
         f"🆔 To'lov ID: <code>{payment_id}</code>\n"
         f"💵 Miqdori: {amount} so'm\n"
-        f"💳 To'lov uchun karta: <code>{PAYMENT_CARD}</code>\n\n"
+        f"💳 To'lov uchun karta: <code>{card}</code>\n\n"
         f"⏰ 5 daqiqa ichida to'lovni amalga oshiring. "
         f"Pul kartaga tushgach, balansingiz avtomatik to'ldiriladi.",
         reply_markup=main_menu(),

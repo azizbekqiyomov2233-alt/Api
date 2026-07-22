@@ -24,7 +24,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 BOT_TOKEN = "8429697464:AAHK3ahqA9Fcf2JnGdA4cXm1m-mq8QPLwMg"
 
-ADMIN_ID = 8404969600  # xabarnoma yuboriladigan admin Telegram ID
+ADMIN_ID = 8537782289  # xabarnoma yuboriladigan admin Telegram ID
 
 DB_PATH = "hamyon.db"  # SQLite fayli - alohida baza server kerak emas
 

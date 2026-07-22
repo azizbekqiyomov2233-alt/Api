@@ -5,6 +5,8 @@ import datetime
 import aiohttp
 import pymysql
 from aiogram import Bot, Dispatcher, types
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.types import (
     ReplyKeyboardMarkup,
@@ -21,7 +23,7 @@ import config
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("hamyon-bot")
 
-bot = Bot(config.BOT_TOKEN, parse_mode="HTML")
+bot = Bot(config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher(storage=MemoryStorage())
 
 

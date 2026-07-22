@@ -1,9 +1,9 @@
 import asyncio
 import logging
 import datetime
+import sqlite3
 
 import aiohttp
-import pymysql
 from aiogram import Bot, Dispatcher, types
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
@@ -19,32 +19,21 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
 # ============================== SOZLAMALAR ==============================
-# ⚠️ Bu qiymatlarni to'g'ri ma'lumotlar bilan to'ldiring.
-
 BOT_TOKEN = "8429697464:AAHK3ahqA9Fcf2JnGdA4cXm1m-mq8QPLwMg"
 
-ADMIN_ID = 8404969600  # xabarnoma yuboriladigan admin Telegram ID
+ADMIN_ID = 8404969600
 
-DB = {
-    "host": "PUT_MYSQL_HOST_HERE",
-    "port": 3306,
-    "user": "PUT_MYSQL_USER_HERE",
-    "password": "PUT_MYSQL_PASSWORD_HERE",
-    "database": "PUT_MYSQL_DATABASE_NAME_HERE",
-}
+DB_PATH = "hamyon.db"
 
-# --- Hamyon API sozlamalari ---
 HAMYON_API_BASE = "https://hamyon-api.uz"
 SHOP_ID = "443"
 SHOP_KEY = "15089791c7ea"
 
-# To'lov qabul qilinadigan karta raqami (foydalanuvchiga ko'rsatiladi)
 PAYMENT_CARD = "5614 6867 0787 6770"
 
 MIN_AMOUNT = 1000
 MAX_AMOUNT = 10_000_000
 
-# To'lov holatini necha soniyada bir tekshirish
 CHECK_INTERVAL_SECONDS = 10
 # ==========================================================================
 
@@ -59,19 +48,10 @@ class TopUp(StatesGroup):
     waiting_amount = State()
 
 
-# ---------------------------------------------------------------- DATABASE
-
 def connect_db():
-    return pymysql.connect(
-        host=DB["host"],
-        port=DB.get("port", 3306),
-        user=DB["user"],
-        password=DB["password"],
-        database=DB["database"],
-        charset="utf8mb4",
-        cursorclass=pymysql.cursors.DictCursor,
-        autocommit=False,
-    )
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
 def init_db():
@@ -79,21 +59,20 @@ def init_db():
     cur = db.cursor()
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            user_id BIGINT NOT NULL PRIMARY KEY,
-            balance BIGINT NOT NULL DEFAULT 0,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            user_id INTEGER PRIMARY KEY,
+            balance INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
     """)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS payments (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id BIGINT NOT NULL,
-            payment_id VARCHAR(128) NOT NULL,
-            amount BIGINT NOT NULL,
-            status VARCHAR(32) NOT NULL DEFAULT 'pending',
-            created_at DATETIME NOT NULL,
-            UNIQUE KEY uniq_payment_id (payment_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            payment_id TEXT NOT NULL UNIQUE,
+            amount INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at TEXT NOT NULL
+        );
     """)
     db.commit()
     cur.close()
@@ -103,10 +82,10 @@ def init_db():
 def get_or_create_user(user_id: int) -> int:
     db = connect_db()
     cur = db.cursor()
-    cur.execute("SELECT balance FROM users WHERE user_id=%s", (user_id,))
+    cur.execute("SELECT balance FROM users WHERE user_id=?", (user_id,))
     row = cur.fetchone()
     if row is None:
-        cur.execute("INSERT INTO users (user_id, balance) VALUES (%s, 0)", (user_id,))
+        cur.execute("INSERT INTO users (user_id, balance) VALUES (?, 0)", (user_id,))
         db.commit()
         balance = 0
     else:
@@ -120,15 +99,13 @@ def add_balance(user_id: int, amount: int):
     db = connect_db()
     cur = db.cursor()
     cur.execute(
-        "UPDATE users SET balance = balance + %s WHERE user_id=%s",
+        "UPDATE users SET balance = balance + ? WHERE user_id=?",
         (amount, user_id),
     )
     db.commit()
     cur.close()
     db.close()
 
-
-# ------------------------------------------------------------------ MENUS
 
 def main_menu() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
@@ -146,8 +123,6 @@ def back_menu() -> ReplyKeyboardMarkup:
         resize_keyboard=True,
     )
 
-
-# ---------------------------------------------------------------- HANDLERS
 
 @dp.message(Command("start"))
 async def cmd_start(msg: types.Message, state: FSMContext):
@@ -199,7 +174,7 @@ async def create_payment(msg: types.Message, state: FSMContext):
     db = connect_db()
     cur = db.cursor()
     cur.execute(
-        "SELECT * FROM payments WHERE user_id=%s AND status='pending'",
+        "SELECT * FROM payments WHERE user_id=? AND status='pending'",
         (msg.from_user.id,),
     )
     existing = cur.fetchone()
@@ -224,7 +199,7 @@ async def create_payment(msg: types.Message, state: FSMContext):
                 timeout=aiohttp.ClientTimeout(total=15),
             ) as resp:
                 data = await resp.json()
-    except Exception as e:
+    except Exception:
         log.exception("Payment create failed")
         cur.close()
         db.close()
@@ -238,11 +213,11 @@ async def create_payment(msg: types.Message, state: FSMContext):
         return
 
     payment_id = data.get("payment_id")
-    now = datetime.datetime.now()
+    now = datetime.datetime.now().isoformat()
 
     cur.execute(
         "INSERT INTO payments (user_id, payment_id, amount, status, created_at) "
-        "VALUES (%s,%s,%s,'pending',%s)",
+        "VALUES (?,?,?,'pending',?)",
         (msg.from_user.id, payment_id, amount, now),
     )
     db.commit()
@@ -275,7 +250,7 @@ async def cancel_payment(call: types.CallbackQuery):
     db = connect_db()
     cur = db.cursor()
     cur.execute(
-        "UPDATE payments SET status='cancelled' WHERE payment_id=%s AND status='pending'",
+        "UPDATE payments SET status='cancelled' WHERE payment_id=? AND status='pending'",
         (payment_id,),
     )
     db.commit()
@@ -289,8 +264,6 @@ async def cancel_payment(call: types.CallbackQuery):
         await call.message.edit_text("ℹ️ Bu to'lov allaqachon yakunlangan yoki bekor qilingan.")
     await call.answer()
 
-
-# ------------------------------------------------------------- BACKGROUND
 
 async def check_payments_loop():
     while True:
@@ -320,7 +293,7 @@ async def check_payments_loop():
                             db2 = connect_db()
                             cur2 = db2.cursor()
                             cur2.execute(
-                                "UPDATE payments SET status='paid' WHERE payment_id=%s AND status='pending'",
+                                "UPDATE payments SET status='paid' WHERE payment_id=? AND status='pending'",
                                 (row["payment_id"],),
                             )
                             updated = cur2.rowcount
@@ -347,7 +320,7 @@ async def check_payments_loop():
                             db2 = connect_db()
                             cur2 = db2.cursor()
                             cur2.execute(
-                                "UPDATE payments SET status=%s WHERE payment_id=%s AND status='pending'",
+                                "UPDATE payments SET status=? WHERE payment_id=? AND status='pending'",
                                 (status, row["payment_id"]),
                             )
                             db2.commit()
@@ -363,8 +336,6 @@ async def check_payments_loop():
 
         await asyncio.sleep(CHECK_INTERVAL_SECONDS)
 
-
-# ------------------------------------------------------------------- MAIN
 
 async def main():
     init_db()

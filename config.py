@@ -1,7 +1,7 @@
 # ⚠️ Bu faylni hech kimga yubormang / GitHub'ga ochiq qo'ymang.
 # Bot tokenini @BotFather orqali /revoke qilib, yangisini shu yerga qo'ying.
 
-BOT_TOKEN = "PUT_YOUR_NEW_BOT_TOKEN_HERE"
+BOT_TOKEN = "8429697464:AAHK3ahqA9Fcf2JnGdA4cXm1m-mq8QPLwMg"
 
 ADMIN_ID = 8404969600  # xabarnoma yuboriladigan admin Telegram ID
 

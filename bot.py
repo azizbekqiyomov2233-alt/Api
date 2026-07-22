@@ -18,12 +18,40 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
-import config
+# ============================== SOZLAMALAR ==============================
+# ⚠️ Bu qiymatlarni to'g'ri ma'lumotlar bilan to'ldiring.
+
+BOT_TOKEN = "PUT_YOUR_NEW_BOT_TOKEN_HERE"
+
+ADMIN_ID = 8404969600  # xabarnoma yuboriladigan admin Telegram ID
+
+DB = {
+    "host": "PUT_MYSQL_HOST_HERE",
+    "port": 3306,
+    "user": "PUT_MYSQL_USER_HERE",
+    "password": "PUT_MYSQL_PASSWORD_HERE",
+    "database": "PUT_MYSQL_DATABASE_NAME_HERE",
+}
+
+# --- Hamyon API sozlamalari ---
+HAMYON_API_BASE = "https://hamyon-api.uz"
+SHOP_ID = "443"
+SHOP_KEY = "15089791c7ea"
+
+# To'lov qabul qilinadigan karta raqami (foydalanuvchiga ko'rsatiladi)
+PAYMENT_CARD = "5614 6867 0787 6770"
+
+MIN_AMOUNT = 1000
+MAX_AMOUNT = 10_000_000
+
+# To'lov holatini necha soniyada bir tekshirish
+CHECK_INTERVAL_SECONDS = 10
+# ==========================================================================
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("hamyon-bot")
 
-bot = Bot(config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+bot = Bot(BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher(storage=MemoryStorage())
 
 
@@ -35,10 +63,11 @@ class TopUp(StatesGroup):
 
 def connect_db():
     return pymysql.connect(
-        host=config.DB["host"],
-        user=config.DB["user"],
-        password=config.DB["password"],
-        database=config.DB["database"],
+        host=DB["host"],
+        port=DB.get("port", 3306),
+        user=DB["user"],
+        password=DB["password"],
+        database=DB["database"],
         charset="utf8mb4",
         cursorclass=pymysql.cursors.DictCursor,
         autocommit=False,
@@ -148,8 +177,8 @@ async def ask_amount(msg: types.Message, state: FSMContext):
     await state.set_state(TopUp.waiting_amount)
     await msg.answer(
         "💵 Balansni necha so'mga to'ldirmoqchisiz?\n"
-        f"📰 Minimal miqdor: {config.MIN_AMOUNT} so'm\n"
-        f"📰 Maksimal miqdor: {config.MAX_AMOUNT} so'm",
+        f"📰 Minimal miqdor: {MIN_AMOUNT} so'm\n"
+        f"📰 Maksimal miqdor: {MAX_AMOUNT} so'm",
         reply_markup=back_menu(),
     )
 
@@ -161,9 +190,9 @@ async def create_payment(msg: types.Message, state: FSMContext):
         return
 
     amount = int(msg.text)
-    if amount < config.MIN_AMOUNT or amount > config.MAX_AMOUNT:
+    if amount < MIN_AMOUNT or amount > MAX_AMOUNT:
         await msg.answer(
-            f"❌ Minimal {config.MIN_AMOUNT} so'm, maksimal {config.MAX_AMOUNT} so'm."
+            f"❌ Minimal {MIN_AMOUNT} so'm, maksimal {MAX_AMOUNT} so'm."
         )
         return
 
@@ -186,10 +215,10 @@ async def create_payment(msg: types.Message, state: FSMContext):
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                f"{config.HAMYON_API_BASE}/payment/create",
+                f"{HAMYON_API_BASE}/payment/create",
                 json={
-                    "shop_id": config.SHOP_ID,
-                    "shop_key": config.SHOP_KEY,
+                    "shop_id": SHOP_ID,
+                    "shop_key": SHOP_KEY,
                     "amount": amount,
                 },
                 timeout=aiohttp.ClientTimeout(total=15),
@@ -232,7 +261,7 @@ async def create_payment(msg: types.Message, state: FSMContext):
         f"✅ To'lov yaratildi!\n\n"
         f"🆔 To'lov ID: <code>{payment_id}</code>\n"
         f"💵 Miqdori: {amount} so'm\n"
-        f"💳 To'lov uchun karta: <code>{config.PAYMENT_CARD}</code>\n\n"
+        f"💳 To'lov uchun karta: <code>{PAYMENT_CARD}</code>\n\n"
         f"⏰ 5 daqiqa ichida to'lovni amalga oshiring. "
         f"Pul kartaga tushgach, balansingiz avtomatik to'ldiriladi.",
         reply_markup=main_menu(),
@@ -278,7 +307,7 @@ async def check_payments_loop():
                     for row in rows:
                         try:
                             async with session.get(
-                                f"{config.HAMYON_API_BASE}/merchant/{row['payment_id']}/json",
+                                f"{HAMYON_API_BASE}/merchant/{row['payment_id']}/json",
                                 timeout=aiohttp.ClientTimeout(total=10),
                             ) as resp:
                                 data = await resp.json()
@@ -306,9 +335,9 @@ async def check_payments_loop():
                                     f"✅ Hisobingizga {row['amount']} so'm qo'shildi.",
                                     reply_markup=main_menu(),
                                 )
-                                if config.ADMIN_ID:
+                                if ADMIN_ID:
                                     await bot.send_message(
-                                        config.ADMIN_ID,
+                                        ADMIN_ID,
                                         f"💰 To'lov qabul qilindi:\n"
                                         f"User ID: {row['user_id']}\n"
                                         f"Miqdor: {row['amount']} so'm\n"
@@ -332,7 +361,7 @@ async def check_payments_loop():
         except Exception:
             log.exception("check_payments_loop error")
 
-        await asyncio.sleep(config.CHECK_INTERVAL_SECONDS)
+        await asyncio.sleep(CHECK_INTERVAL_SECONDS)
 
 
 # ------------------------------------------------------------------- MAIN

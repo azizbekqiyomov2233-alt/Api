@@ -29,7 +29,7 @@ DB_PATH = "hamyon.db"  # SQLite fayli - alohida baza server kerak emas
 
 # --- Hamyon API sozlamalari ---
 HAMYON_API_BASE = "https://hamyon-api.uz"
-SHOP_ID = "443"
+SHOP_ID = 443
 SHOP_KEY = "15089791c7ea"
 
 # To'lov qabul qilinadigan karta raqami (foydalanuvchiga ko'rsatiladi)
@@ -220,6 +220,7 @@ async def create_payment(msg: types.Message, state: FSMContext):
     if not data.get("success"):
         cur.close()
         db.close()
+        log.error("Hamyon API rejected payment create: %s", data)
         await msg.answer("❌ To'lov yaratib bo'lmadi. Qaytadan urinib ko'ring.")
         return
 
